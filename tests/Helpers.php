@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 
 function stream_with_contents(string $contents)

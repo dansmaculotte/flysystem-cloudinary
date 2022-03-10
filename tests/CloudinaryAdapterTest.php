@@ -1,23 +1,16 @@
 <?php
 
-namespace CarlosOCarvalho\Flysystem\Cloudinary;
+namespace DansMaCulotte\Flysystem\Cloudinary;
 
-use CarlosOCarvalho\Flysystem\Cloudinary\CloudinaryAdapter as Adapter;
-use CarlosOCarvalho\Flysystem\Cloudinary\Test\ApplicationCase;
-use League\Flysystem\FileAttributes;
-use League\Flysystem\Filesystem;
+use DansMaCulotte\Flysystem\Cloudinary\Test\ApplicationCase;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 
 class CloudinaryAdapterTest extends ApplicationCase
 {
-
-    
     protected function tearDown(): void
     {
-        
-
         $adapter = $this->adapter();
         /** @var StorageAttributes[] $listing */
         $listing = $adapter->listContents(self::ROOT, false);
@@ -29,10 +22,7 @@ class CloudinaryAdapterTest extends ApplicationCase
                 $adapter->deleteDirectory($item->path());
             }
         }
-
     }
-
-
     
     /**
      * Validate instance type is Class Core
@@ -40,13 +30,12 @@ class CloudinaryAdapterTest extends ApplicationCase
      */
     public function test_valid_instance()
     {
-
-        $this->assertInstanceOf('CarlosOCarvalho\Flysystem\Cloudinary\CloudinaryAdapter', $this->createCloudinaryInstance());
+        $this->assertInstanceOf(CloudinaryAdapter::class, $this->createCloudinaryInstance());
     }
 
     /**
      * @test
-     * Upload success file on api 
+     * Upload success file on api
      * @return void
      */
     public function create_and_check_size_and_check_type()
@@ -60,12 +49,11 @@ class CloudinaryAdapterTest extends ApplicationCase
 
     /**
      * @test
-     * Upload success file on api 
+     * Upload success file on api
      * @return void
      */
     public function create_and_moving_and_failure()
     {
-
         $adapter = $this->adapter();
         $id = $this->makePathFile(sprintf('%s', $this->imageName()));
         $moveId = $this->makePathFile(sprintf('moved-%s', $this->imageName()));
@@ -109,7 +97,6 @@ class CloudinaryAdapterTest extends ApplicationCase
      */
     public function rename_with_folder()
     {
-
         $adapter = $this->adapter();
         $id = $this->makePathFile(sprintf('origin-%s', $this->imageName()));
         $renamedId = $this->makePathFile(sprintf('renamed-%s', $this->imageName()));
@@ -145,7 +132,7 @@ class CloudinaryAdapterTest extends ApplicationCase
     }
     /**
      * @test
-     * CopyFile  
+     * CopyFile
      * @return void
      */
     public function copy_file()
@@ -205,10 +192,10 @@ class CloudinaryAdapterTest extends ApplicationCase
      *
      * @return void
      */
-    public function create_and_check_visibility(){
-       
+    public function create_and_check_visibility()
+    {
         $adapter = $this->adapter();
-        $content = fopen(self::IMAGE_UPDATE,'r');
+        $content = fopen(self::IMAGE_UPDATE, 'r');
         $id = $this->makePathFile(sprintf('file-visibility-%s', $this->imageName()));
         $adapter->writeStream($id, $content);
         fclose($content);
@@ -234,7 +221,7 @@ class CloudinaryAdapterTest extends ApplicationCase
     public function fetching_last_modified(): void
     {
         $adapter = $this->adapter();
-        $content = fopen(self::IMAGE_UPDATE,'r');
+        $content = fopen(self::IMAGE_UPDATE, 'r');
         $id = $this->makePathFile(sprintf('file-visibility-%s', $this->imageName()));
         $adapter->writeStream($id, $content);
         fclose($content);
@@ -243,5 +230,4 @@ class CloudinaryAdapterTest extends ApplicationCase
         $this->assertTrue($lastModified > time() - 30);
         $this->assertTrue($lastModified < time() + 30);
     }
-
 }

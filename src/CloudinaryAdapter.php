@@ -1,25 +1,22 @@
 <?php
 
-namespace CarlosOCarvalho\Flysystem\Cloudinary;
+namespace DansMaCulotte\Flysystem\Cloudinary;
 
+use Cloudinary\Api\Admin\AdminApi;
+use Cloudinary\Api\Upload\UploadApi;
+use Cloudinary\Asset\Media;
+use Cloudinary\Cloudinary;
+use Cloudinary\Configuration\Configuration;
 use Exception;
-use Cloudinary as ClDriver;
-use Cloudinary\Api as Api;
-use Cloudinary\Uploader;
 use League\Flysystem\Config;
-use League\Flysystem\AdapterInterface;
 use League\Flysystem\FileAttributes;
-// use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
-use League\Flysystem\FileNotFoundException;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemOperationFailed;
 use League\Flysystem\UnableToCopyFile;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
-use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use Throwable;
-
 
 /**
  *
@@ -31,7 +28,8 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     protected $api;
 
-    private $visibility;
+    protected UploadApi $uploadApi;
+    protected AdminApi $adminApi;
 
     private const EXTRA_METADATA_FIELDS = [
         'version',
@@ -53,8 +51,9 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function __construct(array $options)
     {
-        ClDriver::config($options);
-        $this->api = new Api;
+        Configuration::instance($options);
+        $this->uploadApi = new UploadApi();
+        $this->adminApi = new AdminApi();
     }
     /**
      * Write a new file.
@@ -89,7 +88,7 @@ class CloudinaryAdapter implements FilesystemAdapter
         $public_id = $options->get('public_id', $path);
         $resource_type = $options->get('resource_type', 'auto');
         $resourceMetadata = stream_get_meta_data($resource);
-        $uploadedMetadata = Uploader::upload(
+        $uploadedMetadata = $this->uploadApi->upload(
             $resourceMetadata['uri'],
             [
                 'public_id' => $public_id,
@@ -110,10 +109,9 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function copy(string $source, string $destination, Config $config): void
     {
-
         try {
-            $url = cloudinary_url_internal($source);
-            Uploader::upload($url, ['public_id' => $destination]);
+            $url = Media::fromParams($source);
+            $this->uploadApi->upload($url, ['public_id' => $destination]);
         } catch (Throwable $exception) {
             throw UnableToCopyFile::fromLocationTo($source, $destination, $exception);
         }
@@ -137,9 +135,10 @@ class CloudinaryAdapter implements FilesystemAdapter
     public function delete($path): void
     {
         try {
-            $result = Uploader::destroy($path, ['invalidate' => true])['result'];
-            if ($result != 'ok')
+            $result = $this->uploadApi->destroy($path, ['invalidate' => true])['result'];
+            if ($result != 'ok') {
                 throw new UnableToDeleteFile('file not found');
+            }
         } catch (Throwable $exception) {
             throw UnableToDeleteFile::atLocation($path, '', $exception);
         }
@@ -154,7 +153,7 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function deleteDirectory($dirname): void
     {
-        $this->api->delete_folder($dirname);
+        $this->adminApi->deleteFolder($dirname);
     }
     /**
      * Create a directory.
@@ -169,7 +168,7 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function createDirectory($dirname, Config $options): void
     {
-        $this->api->create_folder($dirname, (array) $options);
+        $this->adminApi->createFolder($dirname, (array) $options);
     }
     /**
      * Check whether a file exists.
@@ -186,12 +185,18 @@ class CloudinaryAdapter implements FilesystemAdapter
     public function fileExists($path): bool
     {
         try {
-            $this->api->resource($path);
+            $this->adminApi->asset($path);
         } catch (Exception $e) {
             return false;
         }
         return true;
     }
+
+    public function directoryExists(string $path): bool
+    {
+        throw new Exception('Not implemented');
+    }
+
     /**
      * Read a file.
      *
@@ -201,7 +206,7 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function read($path): string
     {
-        $contents = file_get_contents(cloudinary_url($path));
+        $contents = file_get_contents(Media::fromParams($path));
         return (string) $contents;
     }
     /**
@@ -213,7 +218,7 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function readStream($path)
     {
-        return fopen(cloudinary_url($path), 'r');
+        return fopen(Media::fromParams($path), 'r');
     }
     /**
      * List contents of a directory.
@@ -230,7 +235,7 @@ class CloudinaryAdapter implements FilesystemAdapter
         // get resources array
         $response = null;
         do {
-            $response = (array) $this->api->resources([
+            $response = (array) $this->adminApi->assets([
                 'type' => 'upload',
                 'prefix' => $directory,
                 'max_results' => 500,
@@ -244,7 +249,6 @@ class CloudinaryAdapter implements FilesystemAdapter
             //$resources[$i] = $this->prepareResourceMetadata($resource);
             yield  $this->mapToObject($resource);
             //
-
         }
         return $resources;
     }
@@ -258,7 +262,7 @@ class CloudinaryAdapter implements FilesystemAdapter
      */
     public function getResource($path)
     {
-        return (array) $this->api->resource($path);
+        return (array) $this->adminApi->asset($path);
     }
     /**
      * Get all the meta data of a file or directory.
@@ -325,7 +329,7 @@ class CloudinaryAdapter implements FilesystemAdapter
     private function fetchFileMetadata(string $path, string $type): FileAttributes
     {
         try {
-            $result =  $this->getResource($path);
+            $result = $this->getResource($path);
         } catch (Throwable $exception) {
             throw UnableToRetrieveMetadata::create($path, $type, '', $exception);
         }
@@ -344,13 +348,13 @@ class CloudinaryAdapter implements FilesystemAdapter
      * @return FileAttributes
      */
     private function mapToObject($resource): FileAttributes
-    {   
+    {
         return new FileAttributes(
             $resource['public_id'],
             (int) $resource['bytes'],
             'public',
             (int) strtotime($resource['created_at']),
-            (string) sprintf('%s/%s', $resource['resource_type'] , $resource['format']),
+            (string) sprintf('%s/%s', $resource['resource_type'], $resource['format']),
             $this->extractExtraMetadata((array) $resource)
         );
     }

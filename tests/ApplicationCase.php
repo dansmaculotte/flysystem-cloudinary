@@ -1,21 +1,20 @@
 <?php
 
-namespace CarlosOCarvalho\Flysystem\Cloudinary\Test;
-
+namespace DansMaCulotte\Flysystem\Cloudinary\Test;
 
 include_once __DIR__ . '/../vendor/autoload.php';
 
 require_once __DIR__ .'/Helpers.php';
 
-use CarlosOCarvalho\Flysystem\Cloudinary\CloudinaryAdapter as Adapter;
+use DansMaCulotte\Flysystem\Cloudinary\CloudinaryAdapter as Adapter;
 use League\Flysystem\Filesystem;
 use PHPUnit\Framework\TestCase;
 
-
+$dotenv = \Dotenv\Dotenv::createImmutable(__DIR__.'/..');
+$dotenv->load();
 
 class ApplicationCase extends TestCase
 {
-
     const IMAGE = __DIR__ . '/logo-git.png';
     const IMAGE_UPDATE = __DIR__ . '/logo-update.png';
 
@@ -56,12 +55,11 @@ class ApplicationCase extends TestCase
     protected function createCloudinaryInstance()
     {
         self::$config = [
-            'api_key' => '788386319666942',
-            'api_secret' => 'Uu1UjdDROM4m6lq80l7-9Zqt8Mg',
-            'cloud_name' => 'carlosocarvalho',
-            "secure_distribution" => null,
-            "private_cdn" => false,
-            "cname" => null
+            'cloud' => [
+                'api_key' => $_ENV['CLOUDINARY_API_KEY'],
+                'api_secret' => $_ENV['CLOUDINARY_API_SECRET'],
+                'cloud_name' => $_ENV['CLOUDINARY_CLOUD_NAME'],
+            ]
         ];
 
         return new Adapter(self::$config);
@@ -70,6 +68,6 @@ class ApplicationCase extends TestCase
 
     protected function makePathFile($file): string
     {
-         return sprintf('%s/%s', self::ROOT, $file);
+        return sprintf('%s/%s', self::ROOT, $file);
     }
 }
