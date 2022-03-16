@@ -369,7 +369,7 @@ class CloudinaryAdapter implements FilesystemAdapter
     {
         $extracted = [];
 
-        foreach (static::EXTRA_METADATA_FIELDS as $field) {
+        foreach (self::EXTRA_METADATA_FIELDS as $field) {
             if (isset($metadata[$field]) && $metadata[$field] !== '') {
                 $extracted[$field] = $metadata[$field];
             }
