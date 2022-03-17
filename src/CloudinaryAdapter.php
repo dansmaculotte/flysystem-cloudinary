@@ -23,11 +23,6 @@ use Throwable;
  */
 class CloudinaryAdapter implements FilesystemAdapter
 {
-    /**
-     * @var Cloudinary\Api
-     */
-    protected $api;
-
     protected UploadApi $uploadApi;
     protected AdminApi $adminApi;
 
@@ -38,51 +33,27 @@ class CloudinaryAdapter implements FilesystemAdapter
         'url',
         'secure_url',
         'next_cursor',
+        'public_id'
     ];
+
     /**
      * Cloudinary does not suppory visibility - all is public
      */
 
-    /**
-     * Constructor
-     * Sets configuration, and dependency Cloudinary Api.
-     * @param array $options Cloudinary configuration
-     * @param Api   $api    Cloudinary Api instance
-     */
     public function __construct(array $options)
     {
         Configuration::instance($options);
         $this->uploadApi = new UploadApi();
         $this->adminApi = new AdminApi();
     }
-    /**
-     * Write a new file.
-     * Create temporary stream with content.
-     * Pass to writeStream.
-     *
-     * @param string $path
-     * @param string $contents
-     * @param Config $options   Config object
-     *
-     * @return array|false false on failure file meta data on success
-     */
+
     public function write($path, $contents, Config $options): void
     {
-        // 1. Save to temporary local file -- it will be destroyed automatically
         $tempFile = tmpfile();
         fwrite($tempFile, $contents);
-        // 2. Use Cloudinary to send
         $this->writeStream($path, $tempFile, $options);
     }
-    /**
-     * Write a new file using a stream.
-     *
-     * @param string   $path
-     * @param resource $resource
-     * @param Config   $options   Config object
-     *
-     * @return array|false false on failure file meta data on success
-     */
+
     public function writeStream($path, $resource, Config $options): void
     {
         $public_id = $options->get('public_id', $path);
@@ -98,15 +69,6 @@ class CloudinaryAdapter implements FilesystemAdapter
     }
 
 
-    /**
-     * Copy a file.
-     * Copy content from existing url.
-     *
-     * @param string $path
-     * @param string $newpath
-     *
-     * @return bool
-     */
     public function copy(string $source, string $destination, Config $config): void
     {
         try {
@@ -116,6 +78,7 @@ class CloudinaryAdapter implements FilesystemAdapter
             throw UnableToCopyFile::fromLocationTo($source, $destination, $exception);
         }
     }
+
     public function move(string $source, string $destination, Config $config): void
     {
         try {
@@ -125,13 +88,7 @@ class CloudinaryAdapter implements FilesystemAdapter
             throw UnableToMoveFile::fromLocationTo($source, $destination, $exception);
         }
     }
-    /**
-     * Delete a file.
-     *
-     * @param string $path
-     *
-     * @return bool
-     */
+
     public function delete($path): void
     {
         try {
@@ -143,45 +100,17 @@ class CloudinaryAdapter implements FilesystemAdapter
             throw UnableToDeleteFile::atLocation($path, '', $exception);
         }
     }
-    /**
-     * Delete a directory.
-     * Delete Files using directory as a prefix.
-     *
-     * @param string $dirname
-     *
-     * @return bool
-     */
+    
     public function deleteDirectory($dirname): void
     {
         $this->adminApi->deleteFolder($dirname);
     }
-    /**
-     * Create a directory.
-     * Cloudinary does not realy embrace the concept of "directories".
-     * Those are more like a part of a name / public_id.
-     * Just keep swimming.
-     *
-     * @param string $dirname directory name
-     * @param Config $options
-     *
-     * @return array|false
-     */
+
     public function createDirectory($dirname, Config $options): void
     {
         $this->adminApi->createFolder($dirname, (array) $options);
     }
-    /**
-     * Check whether a file exists.
-     * Using url to check response headers.
-     * Maybe I should use api resource?
-     *
-     * substr(get_headers(cloudinary_url_internal($path))[0], -6 ) == '200 OK';
-     * need to test that for spead
-     *
-     * @param string $path
-     *
-     * @return array|bool|null
-     */
+
     public function fileExists($path): bool
     {
         try {
@@ -197,37 +126,18 @@ class CloudinaryAdapter implements FilesystemAdapter
         throw new Exception('Not implemented');
     }
 
-    /**
-     * Read a file.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
+
     public function read($path): string
     {
         $contents = file_get_contents(Media::fromParams($path));
         return (string) $contents;
     }
-    /**
-     * Read a file as a stream.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
+
     public function readStream($path)
     {
         return fopen(Media::fromParams($path), 'r');
     }
-    /**
-     * List contents of a directory.
-     *
-     * @param string $directory
-     * @param bool   $recursive
-     *
-     * @return array
-     */
+
     public function listContents(string $directory, bool $hasRecursive): iterable
     {
         $resources = [];
@@ -253,79 +163,35 @@ class CloudinaryAdapter implements FilesystemAdapter
         return $resources;
     }
 
-
-
-    /**
-     * Get Resource data
-     * @param  string $path
-     * @return array
-     */
     public function getResource($path)
     {
         return (array) $this->adminApi->asset($path);
     }
-    /**
-     * Get all the meta data of a file or directory.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
+
     public function fileSize($path): FileAttributes
     {
         return $this->fetchFileMetadata($path, FileAttributes::ATTRIBUTE_FILE_SIZE);
     }
 
-    /**
-     * @param mixed $visibility
-     * @throws InvalidVisibilityProvided
-     * @throws FilesystemException
-     */
     public function setVisibility(string $path, $visibility): void
     {
     }
 
-    /**
-     * @throws UnableToRetrieveMetadata
-     * @throws FilesystemException
-     */
     public function visibility(string $path): FileAttributes
     {
         return $this->fetchFileMetadata($path, FileAttributes::ATTRIBUTE_VISIBILITY);
     }
-    /**
-     * Get the mimetype of a file.
-     * Actually I don't think cloudinary supports mimetypes.
-     * Or I am just stupid and cannot find it.
-     * This is an ugly hack.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
+
     public function mimetype($path): FileAttributes
     {
         return $this->fetchFileMetadata($path, FileAttributes::ATTRIBUTE_MIME_TYPE);
     }
-    /**
-     * Get the timestamp of a file.
-     *
-     * @param string $path
-     *
-     * @return array|false
-     */
+
     public function lastModified(string $path): FileAttributes
     {
         return $this->fetchFileMetadata($path, FileAttributes::ATTRIBUTE_LAST_MODIFIED);
     }
     
-    /**
-     * fetchFileMetadata get all attributes
-     *
-     * @param string $path
-     * @param string $type
-     * @return FileAttributes
-     */
     private function fetchFileMetadata(string $path, string $type): FileAttributes
     {
         try {
@@ -341,12 +207,6 @@ class CloudinaryAdapter implements FilesystemAdapter
         return $attributes;
     }
 
-    /**
-     * mapToObject map all attributes
-     *
-     * @param [type] $resource
-     * @return FileAttributes
-     */
     private function mapToObject($resource): FileAttributes
     {
         return new FileAttributes(
@@ -359,12 +219,6 @@ class CloudinaryAdapter implements FilesystemAdapter
         );
     }
     
-    /**
-     * Undocumented function
-     *
-     * @param array $metadata
-     * @return array
-     */
     private function extractExtraMetadata(array $metadata): array
     {
         $extracted = [];
@@ -376,5 +230,12 @@ class CloudinaryAdapter implements FilesystemAdapter
         }
 
         return $extracted;
+    }
+
+    public function getMetadata(string $path): FileAttributes
+    {
+        return $this->mapToObject(
+            $this->getResource($path)
+        );
     }
 }

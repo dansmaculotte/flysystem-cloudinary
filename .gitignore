@@ -3,4 +3,4 @@ vendor
 index.php
 README.md
 cover/
-.vscode/
+.php-cs-fixer.cache
